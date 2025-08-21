@@ -1,0 +1,1583 @@
+#include <GL/freeglut.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <math.h>
+#include <iostream>
+#include <string>
+#include <vector>
+
+// Animation variables
+float animationProgress = 0.0f;
+int currentScene = 0;
+int totalScenes = 9;
+bool autoAnimation = true;
+float sceneTimer = 0.0f;
+const float SCENE_DURATION = 8000.0f; // 8 seconds per scene
+float studentX = 0.0f, studentY = 0.0f;
+float busX = -800.0f;
+float windTime = 0.0f;
+float cloudTime = 0.0f;
+
+// Screen dimensions
+int windowWidth = 1200;
+int windowHeight = 800;
+
+// Enhanced Colors
+struct Color {
+    float r, g, b, a;
+    Color(float red, float green, float blue, float alpha = 1.0f) : r(red), g(green), b(blue), a(alpha) {}
+};
+
+// Enhanced color palette
+Color GROUND_COLOR(0.6f, 0.5f, 0.4f);
+Color SIDEWALK_COLOR(0.8f, 0.8f, 0.75f);
+Color GHIBLI_ROAD(0.45f, 0.42f, 0.38f);
+Color GHIBLI_CREAM(0.95f, 0.9f, 0.8f);
+Color GHIBLI_WARM_PINK(1.0f, 0.8f, 0.85f);
+Color GHIBLI_SOFT_BLUE(0.7f, 0.85f, 0.95f);
+Color GHIBLI_TREE_GREEN(0.3f, 0.6f, 0.2f);
+Color GHIBLI_DARK_GREEN(0.15f, 0.4f, 0.1f);
+Color GHIBLI_TRUNK_BROWN(0.4f, 0.25f, 0.1f);
+Color GHIBLI_WARM_YELLOW(1.0f, 0.9f, 0.5f);
+Color GHIBLI_SOFT_RED(0.9f, 0.4f, 0.3f);
+Color GHIBLI_LAVENDER(0.8f, 0.7f, 0.9f);
+Color GHIBLI_PEACH(1.0f, 0.8f, 0.6f);
+Color GHIBLI_MINT(0.7f, 0.9f, 0.8f);
+Color GHIBLI_WHITE(1.0f, 1.0f, 0.98f);
+Color GHIBLI_SHADOW(0.3f, 0.3f, 0.4f, 0.3f);
+Color REALISTIC_GLASS_BLUE(0.7f, 0.85f, 0.95f);
+
+// Scene names
+std::string sceneNames[] = {
+    "Morning at Jamalkhan - The Journey Begins",
+    "Past the Senior Citizens' Peaceful Garden",
+    "Climbing the Hill to Dreams",
+    "Arrival at CIU - Gateway to Knowledge",
+    "Warm Moments in the Cafeteria",
+    "Wisdom Shared in the Seminar Hall",
+    "Digital Worlds in the Computer Lab",
+    "Quiet Study in the Sacred Library",
+    "Journey Home - Return to Jamalkhan"
+};
+
+// Helper function to set color
+void setColor(Color color) {
+    glColor4f(color.r, color.g, color.b, color.a);
+}
+
+// Enhanced rectangle with gradients
+void drawRect(float x, float y, float width, float height, Color color, bool gradient = false) {
+    if (gradient) {
+        glBegin(GL_QUADS);
+        setColor(Color(color.r * 1.1f, color.g * 1.1f, color.b * 1.1f, color.a));
+        glVertex2f(x, y + height);
+        glVertex2f(x + width, y + height);
+        setColor(Color(color.r * 0.9f, color.g * 0.9f, color.b * 0.9f, color.a));
+        glVertex2f(x + width, y);
+        glVertex2f(x, y);
+        glEnd();
+    } else {
+        setColor(color);
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
+        glEnd();
+    }
+}
+
+// Enhanced circle drawing
+void drawCircle(float centerX, float centerY, float radius, Color color, bool glow = false) {
+    if (glow) {
+        setColor(Color(color.r, color.g, color.b, 0.1f));
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(centerX, centerY);
+        for (int i = 0; i <= 64; i++) {
+            float angle = 2.0f * M_PI * i / 64;
+            glVertex2f(centerX + cos(angle) * radius * 1.3f, centerY + sin(angle) * radius * 1.3f);
+        }
+        glEnd();
+    }
+
+    setColor(color);
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex2f(centerX, centerY);
+    for (int i = 0; i <= 64; i++) {
+        float angle = 2.0f * M_PI * i / 64;
+        glVertex2f(centerX + cos(angle) * radius, centerY + sin(angle) * radius);
+    }
+    glEnd();
+}
+
+// Enhanced sky
+void drawEnhancedSky() {
+    // Gradient sky
+    glBegin(GL_QUADS);
+    Color topSky(0.6f, 0.8f, 0.95f);
+    Color bottomSky(0.9f, 0.95f, 0.98f);
+
+    setColor(topSky);
+    glVertex2f(0, windowHeight);
+    glVertex2f(windowWidth, windowHeight);
+    setColor(bottomSky);
+    glVertex2f(windowWidth, windowHeight * 0.4f);
+    glVertex2f(0, windowHeight * 0.4f);
+    glEnd();
+
+    // Moving clouds
+    cloudTime += 0.3f;
+    for (int i = 0; i < 5; i++) {
+        float cloudX = -150 + (i * 280) + sin(cloudTime * 0.01f + i) * 25;
+        float cloudY = windowHeight * 0.7f + cos(cloudTime * 0.008f + i * 2) * 30;
+
+        if (cloudX > windowWidth + 100) cloudX -= windowWidth + 400;
+
+        drawCircle(cloudX, cloudY, 40, GHIBLI_WHITE, true);
+        drawCircle(cloudX + 25, cloudY + 8, 32, GHIBLI_WHITE, true);
+        drawCircle(cloudX - 20, cloudY - 4, 30, GHIBLI_WHITE, true);
+    }
+}
+
+// Enhanced tree with better animation
+void drawEnhancedTree(float x, float y, float scale = 1.0f) {
+    windTime += 0.2f;
+    float sway = sin(windTime * 0.015f + x * 0.01f) * 6.0f * scale;
+
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+    glRotatef(sway, 0, 0, 1);
+
+    float trunkWidth = 18 * scale;
+    float trunkHeight = 75 * scale;
+
+    drawRect(-trunkWidth/2, 0, trunkWidth, trunkHeight, GHIBLI_TRUNK_BROWN, true);
+
+    float crownRadius = 50 * scale;
+    drawCircle(-12 * scale, trunkHeight + 20 * scale, crownRadius * 0.8f, GHIBLI_DARK_GREEN, true);
+    drawCircle(0, trunkHeight + 25 * scale, crownRadius, GHIBLI_TREE_GREEN, true);
+    drawCircle(12 * scale, trunkHeight + 30 * scale, crownRadius * 0.6f, Color(0.35f, 0.65f, 0.25f), true);
+
+    glPopMatrix();
+}
+
+// Enhanced student with better walking animation
+void drawEnhancedStudent(float x, float y, bool walking = false, float scale = 1.0f, int direction = 1) {
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+
+    if (direction == -1) {
+        glScalef(-1, 1, 1);
+    }
+
+    float walkCycle = 0.0f;
+    float bobHeight = 0.0f;
+
+    if (walking) {
+        walkCycle = sin(animationProgress * 0.012f) * 0.4f;
+        bobHeight = abs(sin(animationProgress * 0.024f)) * 3.0f * scale;
+        glTranslatef(0, bobHeight, 0);
+    }
+
+    float headRadius = 20 * scale;
+    float bodyWidth = 26 * scale;
+    float bodyHeight = 42 * scale;
+
+    // Shadow
+    setColor(GHIBLI_SHADOW);
+    drawCircle(0, -5, 32 * scale, GHIBLI_SHADOW);
+
+    // Head
+    drawCircle(0, bodyHeight + headRadius, headRadius, GHIBLI_PEACH, true);
+
+    // Hair
+    Color hairColor(0.3f, 0.15f, 0.05f);
+    drawCircle(-2 * scale, bodyHeight + headRadius + 6 * scale, headRadius * 0.85f, hairColor, true);
+    drawCircle(6 * scale, bodyHeight + headRadius + 4 * scale, headRadius * 0.5f, hairColor);
+
+    // Eyes
+    drawCircle(-4 * scale, bodyHeight + headRadius + 2 * scale, 2.5 * scale, Color(0.2f, 0.1f, 0.05f));
+    drawCircle(4 * scale, bodyHeight + headRadius + 2 * scale, 2.5 * scale, Color(0.2f, 0.1f, 0.05f));
+
+    // Body
+    drawRect(-bodyWidth/2, 0, bodyWidth, bodyHeight, GHIBLI_SOFT_BLUE, true);
+
+    // Arms with walking animation
+    float armSwing = walking ? walkCycle * 30 * scale : 0;
+
+    glPushMatrix();
+    glTranslatef(-bodyWidth/2 - 6 * scale, bodyHeight - 18 * scale, 0);
+    glRotatef(armSwing, 0, 0, 1);
+    drawRect(0, 0, 10 * scale, 32 * scale, GHIBLI_PEACH);
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(bodyWidth/2 - 4 * scale, bodyHeight - 18 * scale, 0);
+    glRotatef(-armSwing, 0, 0, 1);
+    drawRect(0, 0, 10 * scale, 32 * scale, GHIBLI_PEACH);
+    glPopMatrix();
+
+    // Legs with walking animation
+    float legSwing = walking ? -walkCycle * 25 * scale : 0;
+
+    glPushMatrix();
+    glTranslatef(-6 * scale, -28 * scale, 0);
+    glRotatef(legSwing, 0, 0, 1);
+    drawRect(0, 0, 10 * scale, 28 * scale, Color(0.2f, 0.2f, 0.4f));
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(4 * scale, -28 * scale, 0);
+    glRotatef(-legSwing, 0, 0, 1);
+    drawRect(0, 0, 10 * scale, 28 * scale, Color(0.2f, 0.2f, 0.4f));
+    glPopMatrix();
+
+    // Backpack
+    drawRect(-16 * scale, bodyHeight - 22 * scale, 22 * scale, 18 * scale, GHIBLI_SOFT_RED, true);
+
+    glPopMatrix();
+}
+
+// Enhanced teacher
+void drawTeacher(float x, float y, bool standing = true, float scale = 1.0f) {
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+
+    float headRadius = 22 * scale;
+    float bodyWidth = 30 * scale;
+    float bodyHeight = 50 * scale;
+
+    // Shadow
+    setColor(GHIBLI_SHADOW);
+    drawCircle(0, -5, 35 * scale, GHIBLI_SHADOW);
+
+    // Head
+    drawCircle(0, bodyHeight + headRadius, headRadius, GHIBLI_PEACH, true);
+
+    // Hair (different from student)
+    Color teacherHairColor(0.4f, 0.3f, 0.2f);
+    drawCircle(-1 * scale, bodyHeight + headRadius + 5 * scale, headRadius * 0.8f, teacherHairColor, true);
+
+    // Glasses
+    setColor(Color(0.2f, 0.2f, 0.2f));
+    drawCircle(-6 * scale, bodyHeight + headRadius + 1 * scale, 4 * scale, Color(0.9f, 0.9f, 0.9f, 0.7f));
+    drawCircle(6 * scale, bodyHeight + headRadius + 1 * scale, 4 * scale, Color(0.9f, 0.9f, 0.9f, 0.7f));
+
+    // Eyes
+    drawCircle(-6 * scale, bodyHeight + headRadius + 1 * scale, 2 * scale, Color(0.2f, 0.1f, 0.05f));
+    drawCircle(6 * scale, bodyHeight + headRadius + 1 * scale, 2 * scale, Color(0.2f, 0.1f, 0.05f));
+
+    // Body (formal shirt)
+    drawRect(-bodyWidth/2, 0, bodyWidth, bodyHeight, GHIBLI_WHITE, true);
+
+    // Tie
+    drawRect(-3 * scale, bodyHeight - 8 * scale, 6 * scale, 25 * scale, Color(0.2f, 0.2f, 0.6f));
+
+    // Arms
+    drawRect(-bodyWidth/2 - 8 * scale, bodyHeight - 20 * scale, 12 * scale, 35 * scale, GHIBLI_PEACH);
+    drawRect(bodyWidth/2 - 4 * scale, bodyHeight - 20 * scale, 12 * scale, 35 * scale, GHIBLI_PEACH);
+
+    // Legs
+    drawRect(-8 * scale, -35 * scale, 12 * scale, 35 * scale, Color(0.3f, 0.3f, 0.3f));
+    drawRect(4 * scale, -35 * scale, 12 * scale, 35 * scale, Color(0.3f, 0.3f, 0.3f));
+
+    glPopMatrix();
+}
+
+// Enhanced building with ground connection
+void drawEnhancedBuilding(float x, float y, float width, float height, Color color, Color windowColor, int floors = 3) {
+    // Building on ground level
+    drawRect(x, y, width, height, color, true);
+
+    // Building outline
+    setColor(Color(color.r * 0.8f, color.g * 0.8f, color.b * 0.8f));
+    glLineWidth(1.5f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x, y);
+    glVertex2f(x + width, y);
+    glVertex2f(x + width, y + height);
+    glVertex2f(x, y + height);
+    glEnd();
+
+    // Windows
+    float windowWidth = width / 8.0f;
+    float windowHeight = height / (floors * 2.5f);
+
+    for (int floor = 0; floor < floors; floor++) {
+        for (int window = 0; window < 4; window++) {
+            float wx = x + windowWidth + window * windowWidth * 1.6f;
+            float wy = y + height * 0.15f + floor * (height / floors);
+
+            drawRect(wx, wy, windowWidth, windowHeight, windowColor, true);
+
+            // Random lights in windows
+            if ((floor + window + (int)(animationProgress * 0.001f)) % 4 == 0) {
+                setColor(Color(1.0f, 0.9f, 0.6f, 0.8f));
+                drawRect(wx + 2, wy + 2, windowWidth - 4, windowHeight - 4, Color(1.0f, 0.9f, 0.6f, 0.8f));
+            }
+        }
+    }
+}
+
+// Vertical sidewalk with seating arrangements
+void drawVerticalSidewalk(float x, float y, float length, bool rightSide = true) {
+    float width = 60;
+    if (rightSide) {
+        drawRect(x, y, width, length, SIDEWALK_COLOR, true);
+
+        // Benches every 120 units
+        for (int i = 0; i < (int)(length / 140); i++) {
+            float benchY = y + 70 + i * 140;
+
+            // Bench
+            drawRect(x + 10, benchY, 35, 12, Color(0.6f, 0.4f, 0.2f), true);
+            drawRect(x + 10, benchY + 12, 35, 8, Color(0.6f, 0.4f, 0.2f), true);
+
+            // Bench legs
+            drawRect(x + 15, benchY - 5, 6, 17, Color(0.5f, 0.3f, 0.1f));
+            drawRect(x + 35, benchY - 5, 6, 17, Color(0.5f, 0.3f, 0.1f));
+
+            // Plants beside bench
+            if (i % 2 == 0) {
+                drawCircle(x + 52, benchY + 10, 6, GHIBLI_TREE_GREEN);
+                drawRect(x + 50, benchY - 5, 4, 15, GHIBLI_TRUNK_BROWN);
+            }
+        }
+    } else {
+        drawRect(x - width, y, width, length, SIDEWALK_COLOR, true);
+
+        // Benches every 120 units
+        for (int i = 0; i < (int)(length / 140); i++) {
+            float benchY = y + 70 + i * 140;
+
+            // Bench
+            drawRect(x - 45, benchY, 35, 12, Color(0.6f, 0.4f, 0.2f), true);
+            drawRect(x - 45, benchY + 12, 35, 8, Color(0.6f, 0.4f, 0.2f), true);
+
+            // Bench legs
+            drawRect(x - 40, benchY - 5, 6, 17, Color(0.5f, 0.3f, 0.1f));
+            drawRect(x - 20, benchY - 5, 6, 17, Color(0.5f, 0.3f, 0.1f));
+
+            // Plants beside bench
+            if (i % 2 == 0) {
+                drawCircle(x - 8, benchY + 10, 6, GHIBLI_TREE_GREEN);
+                drawRect(x - 10, benchY - 5, 4, 15, GHIBLI_TRUNK_BROWN);
+            }
+        }
+    }
+}
+
+// Shop
+void drawShop(float x, float y, float width, float height, Color shopColor, std::string type = "general") {
+    // Building shadow
+    setColor(GHIBLI_SHADOW);
+    drawRect(x + 2, y - 2, width, height, GHIBLI_SHADOW);
+
+    // Main structure
+    drawRect(x, y, width, height, shopColor, true);
+
+    // Shop front (lower part with display)
+    drawRect(x, y, width, height * 0.4f, Color(shopColor.r * 0.9f, shopColor.g * 0.9f, shopColor.b * 0.9f), true);
+
+    // Door
+    drawRect(x + width * 0.15f, y, width * 0.3f, height * 0.6f, Color(0.4f, 0.2f, 0.1f), true);
+
+    // Shop window/display
+    drawRect(x + width * 0.5f, y + height * 0.1f, width * 0.4f, height * 0.4f, GHIBLI_WARM_YELLOW, true);
+
+    // Items in display
+    if (type == "food") {
+        drawCircle(x + width * 0.6f, y + height * 0.25f, 3, GHIBLI_SOFT_RED);
+        drawCircle(x + width * 0.75f, y + height * 0.35f, 3, GHIBLI_WARM_YELLOW);
+        drawCircle(x + width * 0.65f, y + height * 0.4f, 2, GHIBLI_TREE_GREEN);
+    }
+
+    // Upper window
+    drawRect(x + width * 0.3f, y + height * 0.7f, width * 0.4f, height * 0.2f, GHIBLI_WHITE, true);
+}
+
+// Church building
+void drawChurch(float x, float y, float scale = 1.0f) {
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+
+    // Main church body
+    drawRect(-60 * scale, 0, 120 * scale, 100 * scale, GHIBLI_WHITE, true);
+
+    // Church tower
+    drawRect(-20 * scale, 100 * scale, 40 * scale, 60 * scale, GHIBLI_WHITE, true);
+
+    // Cross on top
+    drawRect(-2 * scale, 160 * scale, 4 * scale, 20 * scale, Color(0.6f, 0.4f, 0.2f));
+    drawRect(-8 * scale, 166 * scale, 16 * scale, 4 * scale, Color(0.6f, 0.4f, 0.2f));
+
+    // Church door
+    drawRect(-15 * scale, 0, 30 * scale, 50 * scale, Color(0.5f, 0.3f, 0.1f), true);
+
+    // Windows
+    for (int i = 0; i < 3; i++) {
+        float winX = -40 + i * 40;
+        drawRect(winX - 8, 60, 16, 30, GHIBLI_WARM_YELLOW, true);
+    }
+
+    glPopMatrix();
+}
+
+// Government school
+void drawGovtSchool(float x, float y, float scale = 1.0f) {
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+
+    // School building
+    drawRect(-80 * scale, 0, 160 * scale, 80 * scale, Color(0.9f, 0.9f, 0.8f), true);
+
+    // School sign
+    drawRect(-40 * scale, 85 * scale, 80 * scale, 15 * scale, Color(0.2f, 0.4f, 0.8f), true);
+
+    // Multiple windows
+    for (int i = 0; i < 6; i++) {
+        float winX = -70 + i * 25;
+        drawRect(winX, 40, 20, 25, GHIBLI_WARM_YELLOW, true);
+        drawRect(winX, 15, 20, 20, GHIBLI_WARM_YELLOW, true);
+    }
+
+    // School gate
+    drawRect(-100 * scale, 0, 20 * scale, 40 * scale, Color(0.3f, 0.3f, 0.3f));
+    drawRect(80 * scale, 0, 20 * scale, 40 * scale, Color(0.3f, 0.3f, 0.3f));
+
+    glPopMatrix();
+}
+
+// Enhanced CIU gate
+void drawEnhancedCIUGate(float x, float y) {
+    // Gate pillars
+    drawRect(x - 60, y, 40, 100, Color(0.7f, 0.7f, 0.7f), true);
+    drawRect(x + 360, y, 40, 100, Color(0.7f, 0.7f, 0.7f), true);
+
+    // Top beam
+    drawRect(x - 60, y + 80, 460, 20, Color(0.7f, 0.7f, 0.7f), true);
+
+    // University sign board (blue background)
+    drawRect(x - 40, y + 105, 420, 35, Color(0.2f, 0.4f, 0.8f), true);
+
+    // Open black gate structure
+    setColor(Color(0.1f, 0.1f, 0.1f));
+    glLineWidth(4.0f);
+
+    // Left gate (open position)
+    glBegin(GL_LINES);
+    glVertex2f(x, y);
+    glVertex2f(x - 40, y);
+    glVertex2f(x - 40, y);
+    glVertex2f(x - 40, y + 80);
+    glVertex2f(x - 40, y + 80);
+    glVertex2f(x, y + 80);
+    glEnd();
+
+    // Right gate (open position)
+    glBegin(GL_LINES);
+    glVertex2f(x + 340, y);
+    glVertex2f(x + 380, y);
+    glVertex2f(x + 380, y);
+    glVertex2f(x + 380, y + 80);
+    glVertex2f(x + 380, y + 80);
+    glVertex2f(x + 340, y + 80);
+    glEnd();
+}
+
+// Guard with animation
+void drawGuard(float x, float y, float scale = 1.0f) {
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+
+    // Shadow
+    setColor(GHIBLI_SHADOW);
+    drawCircle(0, -5, 30 * scale, GHIBLI_SHADOW);
+
+    // Guard uniform (different color)
+    drawCircle(0, 50 * scale, 18 * scale, GHIBLI_PEACH);
+    drawRect(-12 * scale, 0, 24 * scale, 40 * scale, Color(0.3f, 0.5f, 0.3f), true); // Khaki uniform
+
+    // Cap
+    drawRect(-10 * scale, 55 * scale, 20 * scale, 8 * scale, Color(0.2f, 0.4f, 0.2f));
+    drawRect(-12 * scale, 63 * scale, 24 * scale, 3 * scale, Color(0.2f, 0.4f, 0.2f));
+
+    // Arms
+    drawRect(-18 * scale, 25 * scale, 10 * scale, 25 * scale, GHIBLI_PEACH);
+    drawRect(8 * scale, 25 * scale, 10 * scale, 25 * scale, GHIBLI_PEACH);
+
+    // Legs
+    drawRect(-8 * scale, -30 * scale, 12 * scale, 30 * scale, Color(0.2f, 0.3f, 0.2f));
+    drawRect(4 * scale, -30 * scale, 12 * scale, 30 * scale, Color(0.2f, 0.3f, 0.2f));
+
+    glPopMatrix();
+}
+
+// Enhanced bus
+void drawEnhancedBus(float x, float y, float scale = 1.0f) {
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+
+    float busWidth = 200 * scale;
+    float busHeight = 110 * scale;
+    float wheelRadius = 25 * scale;
+
+    // Bus shadow
+    setColor(GHIBLI_SHADOW);
+    drawRect(-10, -20, busWidth + 20, 25, GHIBLI_SHADOW);
+
+    // Main bus body
+    drawRect(0, 0, busWidth, busHeight, GHIBLI_WARM_YELLOW, true);
+
+    // Bus stripe
+    drawRect(0, busHeight - 15, busWidth, 10, GHIBLI_SOFT_RED);
+
+    // Windows with better details
+    for (int i = 0; i < 5; i++) {
+        float wx = 15 + i * 35;
+        drawRect(wx, busHeight - 50, 30, 28, GHIBLI_WHITE, true);
+
+        // Window frames
+        setColor(Color(0.6f, 0.6f, 0.6f));
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(wx, busHeight - 50);
+        glVertex2f(wx + 30, busHeight - 50);
+        glVertex2f(wx + 30, busHeight - 22);
+        glVertex2f(wx, busHeight - 22);
+        glEnd();
+    }
+
+    // Front and back doors
+    drawRect(busWidth - 30, 5, 25, busHeight - 15, GHIBLI_MINT, true);
+    drawRect(5, 5, 25, busHeight - 15, GHIBLI_MINT, true);
+
+    // Wheels with rotation
+    float wheelRotation = fmod(animationProgress * 3.0f, 360.0f);
+
+    // Back wheel
+    drawCircle(40, -10, wheelRadius, Color(0.15f, 0.15f, 0.15f), true);
+    drawCircle(40, -10, wheelRadius - 10, Color(0.4f, 0.4f, 0.4f));
+
+    // Front wheel
+    drawCircle(busWidth - 40, -10, wheelRadius, Color(0.15f, 0.15f, 0.15f), true);
+    drawCircle(busWidth - 40, -10, wheelRadius - 10, Color(0.4f, 0.4f, 0.4f));
+
+    // Headlights
+    drawCircle(busWidth - 10, 30, 8, GHIBLI_WHITE, true);
+    drawCircle(busWidth - 10, 50, 8, GHIBLI_WHITE, true);
+
+    glPopMatrix();
+}
+
+// Enhanced car with better details
+void drawEnhancedCar(float x, float y, Color carColor, float scale = 0.7f) {
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+
+    float carWidth = 90 * scale;
+    float carHeight = 45 * scale;
+
+    // Car shadow
+    setColor(GHIBLI_SHADOW);
+    drawRect(-8, -12, carWidth + 16, 20, GHIBLI_SHADOW);
+
+    // Car body
+    drawRect(0, 0, carWidth, carHeight, carColor, true);
+
+    // Windows
+    drawRect(15 * scale, carHeight - 28 * scale, 60 * scale, 22 * scale, GHIBLI_WHITE, true);
+
+    // Windshield frame
+    setColor(Color(0.3f, 0.3f, 0.3f));
+    glLineWidth(2.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(15 * scale, carHeight - 28 * scale);
+    glVertex2f(75 * scale, carHeight - 28 * scale);
+    glVertex2f(75 * scale, carHeight - 6 * scale);
+    glVertex2f(15 * scale, carHeight - 6 * scale);
+    glEnd();
+
+    // Headlights
+    drawCircle(carWidth - 5, carHeight - 15, 4 * scale, GHIBLI_WHITE, true);
+    drawCircle(carWidth - 5, carHeight - 25, 4 * scale, GHIBLI_WHITE, true);
+
+    // Wheels
+    drawCircle(18 * scale, -8, 12 * scale, Color(0.15f, 0.15f, 0.15f), true);
+    drawCircle(carWidth - 18 * scale, -8, 12 * scale, Color(0.15f, 0.15f, 0.15f), true);
+
+    glPopMatrix();
+}
+
+// Enhanced guard room with details
+void drawEnhancedGuardRoom(float x, float y, float width, float height, Color roomColor) {
+    // Building shadow
+    setColor(GHIBLI_SHADOW);
+    drawRect(x + 3, y - 3, width, height, GHIBLI_SHADOW);
+
+    // Main structure
+    drawRect(x, y, width, height, roomColor, true);
+
+    // Roof
+    setColor(Color(roomColor.r * 0.7f, roomColor.g * 0.5f, roomColor.b * 0.3f));
+    glBegin(GL_TRIANGLES);
+    glVertex2f(x - 8, y + height);
+    glVertex2f(x + width + 8, y + height);
+    glVertex2f(x + width/2, y + height + 25);
+    glEnd();
+
+    // Door
+    drawRect(x + width * 0.3f, y, width * 0.4f, height * 0.85f, Color(0.4f, 0.2f, 0.1f), true);
+
+    // Door handle
+    drawCircle(x + width * 0.65f, y + height * 0.45f, 2, GHIBLI_WARM_YELLOW);
+
+    // Window
+    drawRect(x + width * 0.05f, y + height * 0.6f, width * 0.2f, height * 0.25f, GHIBLI_WARM_YELLOW, true);
+}
+
+// Scene 0: Fixed Jamalkhan Bus Stop with buildings on all sides
+void drawEnhancedJamalkhanBusStop() {
+    drawEnhancedSky();
+
+    // Ground level
+    drawRect(0, 0, windowWidth, windowHeight, GROUND_COLOR, true);
+
+    // Main horizontal road
+    drawRect(0, 350, windowWidth, 100, GHIBLI_ROAD, true);
+
+    // Vertical intersection road
+    drawRect(550, 0, 100, windowHeight, GHIBLI_ROAD, true);
+
+    // Road markings - horizontal
+    setColor(GHIBLI_WHITE);
+    for (int i = 0; i < 12; i++) {
+        drawRect(i * 110 + 30, 390, 70, 20, GHIBLI_WHITE);
+    }
+
+    // Road markings - vertical
+    for (int i = 0; i < 8; i++) {
+        drawRect(590, i * 100 + 30, 20, 60, GHIBLI_WHITE);
+    }
+
+    // Central roundabout
+    drawCircle(600, 400, 45, Color(0.6f, 0.5f, 0.3f), true);
+    drawCircle(600, 400, 35, GHIBLI_TREE_GREEN);
+
+    // Monument in roundabout
+    drawRect(590, 385, 20, 35, GHIBLI_CREAM, true);
+
+    // Buildings on all four sides - properly placed on sidewalks
+    // Top side buildings
+    drawEnhancedBuilding(50, 450, 120, 120, GHIBLI_CREAM, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(200, 470, 100, 100, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(320, 460, 140, 110, GHIBLI_LAVENDER, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(720, 450, 130, 130, Color(0.8f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(880, 470, 110, 100, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(1020, 460, 150, 120, GHIBLI_MINT, GHIBLI_WARM_YELLOW, 3);
+
+    // Bottom side buildings
+    drawEnhancedBuilding(80, 180, 140, 140, Color(0.9f, 0.8f, 0.7f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(250, 200, 110, 120, GHIBLI_SOFT_BLUE, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(380, 190, 120, 130, Color(0.8f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(750, 180, 120, 140, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(900, 200, 130, 120, Color(0.9f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(1060, 190, 120, 130, GHIBLI_LAVENDER, GHIBLI_WARM_YELLOW, 3);
+
+    // Left side buildings
+    drawEnhancedBuilding(50, 580, 100, 120, Color(0.8f, 0.7f, 0.9f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(180, 600, 120, 100, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(330, 590, 110, 110, Color(0.7f, 0.8f, 0.8f), GHIBLI_WARM_YELLOW, 2);
+
+    // Right side buildings
+    drawEnhancedBuilding(750, 580, 110, 120, Color(0.9f, 0.8f, 0.8f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(890, 600, 100, 100, GHIBLI_MINT, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(1020, 590, 130, 110, Color(0.8f, 0.9f, 0.7f), GHIBLI_WARM_YELLOW, 2);
+
+    // Church - made more visible
+    drawChurch(450, 40, 0.8f);
+
+    // Shops on sidewalks
+    drawShop(480, 500, 70, 55, Color(0.7f, 0.9f, 0.6f), "general");
+    drawShop(680, 120, 75, 65, Color(0.8f, 0.6f, 0.8f), "general");
+
+
+    // Trees on sidewalks
+    drawEnhancedTree(480, 520, 1.2f);
+    drawEnhancedTree(720, 540, 1.1f);
+    drawEnhancedTree(750, 80, 1.0f);
+
+    // Enhanced bus
+    float currentBusX = -250 + animationProgress * 0.2f;
+    if (currentBusX > 150) currentBusX = 150;
+    drawEnhancedBus(currentBusX, 320, 0.9f);
+
+    // Traffic on roads
+    float car1X = fmod(animationProgress * 0.4f, windowWidth + 300) - 150;
+    float car2X = fmod(animationProgress * 0.3f + 400, windowWidth + 300) - 150;
+
+    if (car1X > -120 && car1X < windowWidth) {
+        drawEnhancedCar(car1X, 370, GHIBLI_SOFT_RED);
+    }
+    if (car2X > -120 && car2X < windowWidth) {
+        drawEnhancedCar(car2X, 370, Color(0.2f, 0.6f, 0.8f));
+    }
+
+    // Vertical road traffic
+    float carVertical1Y = fmod(animationProgress * 0.35f, windowHeight + 200) - 100;
+    if (carVertical1Y > -80 && carVertical1Y < windowHeight) {
+        drawEnhancedCar(575, carVertical1Y, GHIBLI_MINT);
+    }
+
+    // Students and pedestrians
+    if (animationProgress > 1500) {
+        float student1X = currentBusX + 220 + (animationProgress - 1500) * 0.06f;
+        drawEnhancedStudent(student1X, 380, true);
+    }
+
+    // Guards
+    drawGuard(510, 380, 0.9f);
+    drawGuard(680, 380, 0.85f);
+}
+
+// Scene 1: Senior Citizens Club - removed sky, more ground buildings
+void drawEnhancedSeniorCitizensClub() {
+    // All ground - no sky
+    drawRect(0, 0, windowWidth, windowHeight, GROUND_COLOR, true);
+
+    // Main vertical road
+    drawRect(500, 0, 200, windowHeight, GHIBLI_ROAD, true);
+
+    // Road markings
+    setColor(GHIBLI_WHITE);
+    for (int i = 0; i < 10; i++) {
+        drawRect(590, i * 90, 20, 55, GHIBLI_WHITE);
+    }
+
+    // Vertical sidewalks
+    drawVerticalSidewalk(500, 0, windowHeight, false);
+    drawVerticalSidewalk(700, 0, windowHeight, true);
+
+    // Left side - Government school and other buildings
+    drawGovtSchool(200, 450, 0.8f);
+    drawEnhancedBuilding(50, 400, 120, 180, Color(0.8f, 0.7f, 0.6f), GHIBLI_WARM_YELLOW, 4);
+    drawEnhancedBuilding(180, 200, 100, 150, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(300, 150, 130, 200, Color(0.9f, 0.8f, 0.7f), GHIBLI_WARM_YELLOW, 5);
+    drawEnhancedBuilding(80, 50, 140, 120, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(250, 30, 120, 100, Color(0.8f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 2);
+
+    // Right side - Senior Citizens Club and other buildings
+    drawEnhancedBuilding(750, 400, 200, 180, GHIBLI_WHITE, GHIBLI_WARM_YELLOW, 4); // Main Senior Citizens Club
+    drawEnhancedBuilding(980, 450, 140, 130, Color(0.9f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(800, 200, 120, 150, GHIBLI_LAVENDER, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(950, 180, 180, 200, Color(0.8f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 5);
+    drawEnhancedBuilding(720, 50, 130, 120, GHIBLI_MINT, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(880, 30, 150, 130, Color(0.9f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 3);
+
+    // Shops along sidewalks
+    drawShop(450, 520, 70, 50, Color(0.8f, 0.6f, 0.7f), "general");
+    drawShop(430, 350, 65, 45, Color(0.7f, 0.8f, 0.6f), "food");
+    drawShop(440, 200, 75, 55, Color(0.6f, 0.7f, 0.9f), "general");
+    drawShop(720, 520, 70, 50, Color(0.9f, 0.7f, 0.6f), "food");
+    drawShop(730, 350, 65, 45, Color(0.8f, 0.8f, 0.6f), "general");
+    drawShop(740, 180, 75, 55, Color(0.7f, 0.6f, 0.8f), "general");
+
+    // Trees scattered around
+    drawEnhancedTree(120, 350, 1.4f);
+    drawEnhancedTree(350, 380, 1.2f);
+    drawEnhancedTree(450, 450, 1.1f);
+    drawEnhancedTree(780, 350, 1.3f);
+    drawEnhancedTree(950, 320, 1.0f);
+    drawEnhancedTree(1100, 400, 1.2f);
+
+    // Enhanced vehicles on road
+    float bus1Y = fmod(animationProgress * 0.35f, windowHeight + 300) - 150;
+    float car1Y = fmod(animationProgress * 0.4f + 200, windowHeight + 300) - 150;
+
+    if (bus1Y > -100 && bus1Y < windowHeight) {
+        drawRect(530, bus1Y, 90, 55, Color(0.1f, 0.8f, 0.2f), true); // CNG
+        drawCircle(550, bus1Y - 15, 16, Color(0.1f, 0.1f, 0.1f), true);
+        drawCircle(600, bus1Y - 15, 16, Color(0.1f, 0.1f, 0.1f), true);
+    }
+
+    if (car1Y > -80 && car1Y < windowHeight) {
+        drawEnhancedBus(520, car1Y, 0.6f);
+    }
+
+    // Multiple students and pedestrians
+    float student1Y = fmod(animationProgress * 0.08f, windowHeight + 100) - 50;
+    float student2Y = fmod(animationProgress * 0.06f + 300, windowHeight + 100) - 50;
+
+    if (student1Y > 0 && student1Y < windowHeight) {
+        drawEnhancedStudent(470, student1Y, true, 0.9f);
+    }
+    if (student2Y > 0 && student2Y < windowHeight) {
+        drawEnhancedStudent(750, student2Y, true, 0.85f, -1);
+    }
+
+    // Guards near important buildings
+    drawGuard(480, 450, 0.9f);
+    drawGuard(720, 380, 0.85f);
+}
+
+// Scene 2: Enhanced Uphill to CIU
+void drawEnhancedUphillToCIU() {
+    drawEnhancedSky();
+
+    // Sloped ground
+    setColor(GROUND_COLOR);
+    glBegin(GL_QUADS);
+    glVertex2f(0, 0);
+    glVertex2f(windowWidth, 0);
+    glVertex2f(windowWidth, 520);
+    glVertex2f(0,300);
+    glEnd();
+
+    // Main uphill road
+    drawRect(480, 40, 240, 370, GHIBLI_ROAD, true);
+
+
+    // Road markings
+    setColor(GHIBLI_WHITE);
+    for (int i = 0; i < 5; i++) {
+        drawRect(590, i * 90, 20, 55, GHIBLI_WHITE);
+    }
+
+
+    // Buildings on sidewalks properly placed
+    drawEnhancedBuilding(80, 300, 140, 120, Color(0.8f, 0.6f, 0.5f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(250, 320, 120, 100, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(800, 360, 160, 160, Color(0.7f, 0.8f, 0.7f), GHIBLI_WHITE, 4);
+    drawEnhancedBuilding(980, 400, 180, 200, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 5);
+    drawEnhancedBuilding(980, 450, 140, 130, Color(0.9f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(800, 200, 120, 150, GHIBLI_LAVENDER, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(950, 180, 180, 200, Color(0.8f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 5);
+    drawEnhancedBuilding(720, 50, 130, 120, GHIBLI_MINT, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(880, 30, 150, 130, Color(0.9f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(180, 200, 100, 150, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(300, 150, 130, 200, Color(0.9f, 0.8f, 0.7f), GHIBLI_WARM_YELLOW, 5);
+    drawEnhancedBuilding(80, 50, 140, 120, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(250, 30, 120, 100, Color(0.8f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 2);
+
+
+
+    // Trees on slope
+    drawEnhancedTree(380, 220, 1.1f);
+    drawEnhancedTree(750, 200, 1.3f);
+    drawEnhancedTree(1050, 350, 1.0f);
+
+    // Student walking uphill
+    float slopeProgress = fmod(animationProgress * 0.05f, 300);
+    float studentSlopeX = 520 + slopeProgress * 0.4f;
+    float studentSlopeY = 80 + slopeProgress * 0.8f;
+    drawEnhancedStudent(studentSlopeX, studentSlopeY, true, 0.9f);
+}
+
+// Scene 3: Enhanced CIU Building - fixed placement
+void drawEnhancedCIUBuilding() {
+    drawEnhancedSky();
+
+    // Ground level
+    drawRect(0, 0, windowWidth, windowHeight, GROUND_COLOR, true);
+
+    // Main uphill road
+    drawRect(480, 40, 280, 440, GHIBLI_ROAD, true);
+
+    // Road markings
+    setColor(GHIBLI_WHITE);
+    for (int i = 0; i < 6; i++) {
+        drawRect(590, i * 90, 20, 55, GHIBLI_WHITE);
+    }
+
+    // Enhanced CIU gate properly on ground
+    drawEnhancedCIUGate(450, 400);
+
+    // Main CIU building properly grounded behind gate
+    drawEnhancedBuilding(400, 500, 440, 300, GHIBLI_CREAM, GHIBLI_WARM_YELLOW, 5);
+
+    // Parked cars beside road (not on road)
+    drawEnhancedCar(420, 350, Color(0.8f, 0.8f, 0.8f), 0.8f);
+    drawEnhancedCar(450, 260, GHIBLI_SOFT_RED, 0.75f);
+    drawEnhancedCar(650, 250, Color(0.3f, 0.3f, 0.8f), 0.8f);
+    drawEnhancedCar(720, 360, GHIBLI_WARM_YELLOW, 0.75f);
+
+    // Surrounding buildings on proper ground
+    drawEnhancedBuilding(50, 400, 180, 200, GHIBLI_CREAM, GHIBLI_WARM_YELLOW, 4);
+    drawEnhancedBuilding(950, 450, 220, 150, Color(0.7f, 0.8f, 0.7f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(180, 200, 100, 150, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(300, 150, 130, 200, Color(0.9f, 0.8f, 0.7f), GHIBLI_WARM_YELLOW, 5);
+    drawEnhancedBuilding(80, 50, 140, 120, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(250, 30, 120, 100, Color(0.8f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(800, 200, 120, 150, GHIBLI_LAVENDER, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(950, 180, 180, 200, Color(0.8f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 5);
+    drawEnhancedBuilding(720, 50, 130, 120, GHIBLI_MINT, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(880, 30, 150, 130, Color(0.9f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 3);
+
+    // Trees around campus
+    drawEnhancedTree(150, 350, 1.4f);
+    drawEnhancedTree(250, 330, 1.2f);
+    drawEnhancedTree(1000, 400, 1.3f);
+    drawEnhancedTree(1150, 420, 1.1f);
+
+    // Students approaching
+    float approachProgress1 = fmod(animationProgress * 0.04f, 200);
+    drawEnhancedStudent(250 + approachProgress1, 300, true);
+
+
+}
+
+// Scene 4: Enhanced CIU Cafeteria
+void drawEnhancedCIUCafeteria() {
+    // Warm floor
+    drawRect(0, 0, windowWidth, 320, Color(0.9f, 0.9f, 0.85f), true);
+
+    // Soft walls
+    drawRect(0, 320, windowWidth, windowHeight - 320, Color(0.95f, 0.95f, 0.9f), true);
+
+    // Ceiling lights
+    for (int i = 0; i < 6; i++) {
+        float lightX = 150 + i * 180;
+        drawCircle(lightX, 650, 30, GHIBLI_WARM_YELLOW, true);
+    }
+
+    // Guard room
+    drawEnhancedGuardRoom(60, 480, 140, 120, Color(0.7f, 0.6f, 0.5f));
+    drawGuard(120, 500, 0.8f);
+     drawGuard(150, 500, 0.8f);
+
+    // Tables and chairs with more students
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 4; col++) {
+            float tableX = 280 + col * 200;
+            float tableY = 120 + row * 140;
+
+            // Table
+            drawRect(tableX - 45, tableY - 22, 90, 45, Color(0.9f, 0.8f, 0.6f), true);
+
+            // Yellow chairs and students
+            Color chairColor = GHIBLI_WARM_YELLOW;
+            drawRect(tableX - 70, tableY - 12, 22, 25, chairColor, true);
+            drawRect(tableX + 48, tableY - 12, 22, 25, chairColor, true);
+            drawRect(tableX - 12, tableY - 50, 25, 22, chairColor, true);
+            drawRect(tableX - 12, tableY + 25, 25, 22, chairColor, true);
+
+            // Students at tables
+            if ((row + col) % 3 != 2) {
+                drawEnhancedStudent(tableX - 60, tableY + 10, false, 0.7f);
+            }
+            if ((row + col) % 4 != 3) {
+                drawEnhancedStudent(tableX + 60, tableY + 10, false, 0.7f);
+            }
+            if ((row + col) % 5 != 4) {
+                drawEnhancedStudent(tableX, tableY - 40, false, 0.7f);
+            }
+        }
+    }
+
+    // Windows with proper frames
+    drawRect(windowWidth - 150, 400, 120, 180, REALISTIC_GLASS_BLUE);
+    setColor(Color(0.4f, 0.4f, 0.4f));
+    glLineWidth(3.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(windowWidth - 150, 400);
+    glVertex2f(windowWidth - 30, 400);
+    glVertex2f(windowWidth - 30, 580);
+    glVertex2f(windowWidth - 150, 580);
+    glEnd();
+
+    // Additional standing students
+    drawEnhancedStudent(150, 200, false, 0.8f);
+    drawEnhancedStudent(200, 350, true, 0.7f);
+    drawEnhancedStudent(1050, 180, false, 0.8f);
+}
+
+// Scene 5: Enhanced Computer Lab
+void drawEnhancedComputerLab() {
+    // Floor and walls
+    drawRect(0, 0, windowWidth, 320, Color(0.9f, 0.9f, 0.85f), true);
+    drawRect(0, 320, windowWidth, windowHeight - 320, Color(0.95f, 0.95f, 0.9f), true);
+    // Whiteboard with markers
+    drawRect(400, 550, 400, 120, Color(0.98f, 0.98f, 0.98f));
+    setColor(Color(0.3f, 0.3f, 0.3f));
+    glLineWidth(3.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(400, 550);
+    glVertex2f(800, 550);
+    glVertex2f(800, 670);
+    glVertex2f(400, 670);
+    glEnd();
+
+    // Marker tray
+    drawRect(395, 530, 410, 15, Color(0.7f, 0.7f, 0.7f));
+
+    // Ceiling lights
+    for (int i = 0; i < 5; i++) {
+        drawRect(150 + i * 200, 650, 100, 15, GHIBLI_WARM_YELLOW, true);
+    }
+
+    // Computer desks with students
+    for (int row = 0; row < 5; row++) {
+        for (int col = 0; col < 7; col++) {
+            float deskX = 100 + col * 150;
+            float deskY = 100 + row * 85;
+
+            // Desk
+            drawRect(deskX, deskY, 75, 35, Color(0.7f, 0.5f, 0.3f), true);
+
+            // Monitor with animated screen
+            drawRect(deskX + 12, deskY + 40, 45, 30, Color(0.2f, 0.2f, 0.2f), true);
+            Color screenGlow = Color(0.3f + 0.1f * sin(animationProgress * 0.01f + col + row),
+                                   0.4f + 0.1f * sin(animationProgress * 0.012f + col),
+                                   0.6f + 0.05f * sin(animationProgress * 0.008f + row));
+            drawRect(deskX + 15, deskY + 43, 39, 24, screenGlow, true);
+
+            // Monitor stand
+            drawRect(deskX + 32, deskY + 30, 8, 12, Color(0.5f, 0.5f, 0.5f), true);
+
+            // Keyboard and mouse
+            drawRect(deskX + 18, deskY + 3, 35, 12, Color(0.3f, 0.3f, 0.3f), true);
+            drawRect(deskX + 60, deskY + 8, 6, 10, Color(0.4f, 0.4f, 0.4f), true);
+
+            // Chair
+            drawCircle(deskX + 37, deskY - 18, 12, Color(0.4f, 0.4f, 0.4f), true);
+
+            // Students at computers
+            if ((row + col) % 3 != 2) {
+                drawEnhancedStudent(deskX + 37, deskY + 15, false, 0.6f);
+            }
+        }
+    }
+
+    // Teacher at front desk
+    drawRect(350, 480, 120, 60, Color(0.6f, 0.4f, 0.2f), true);
+    drawTeacher(410, 540, true, 0.8f);
+
+
+}
+
+// Scene 6: Enhanced Seminar Hall - faculty seating beside podium horizontally
+void drawEnhancedSeminarHall() {
+    // Floor and walls
+    drawRect(0, 0, windowWidth, 260, Color(0.85f, 0.85f, 0.8f), true);
+    drawRect(0, 260, windowWidth, windowHeight - 260, Color(0.95f, 0.95f, 0.9f), true);
+
+    // Lighting
+    for (int i = 0; i < 4; i++) {
+        float lightX = 200 + i * 200;
+        drawRect(lightX, 650, 150, 20, GHIBLI_WARM_YELLOW, true);
+    }
+
+    // Student seating - 8 rows of 10 chairs
+    for (int row = 0; row < 8; row++) {
+        for (int col = 0; col < 10; col++) {
+            float chairX = 300 + col * 70;
+            float chairY = 60 + row * 35;
+
+            // Chair
+            drawRect(chairX, chairY, 22, 12, Color(0.2f, 0.2f, 0.2f), true);
+            drawRect(chairX, chairY + 12, 22, 18, Color(0.2f, 0.2f, 0.2f), true);
+
+            // Students in chairs
+            if ((row * col + row + col) % 5 != 0) {
+                drawEnhancedStudent(chairX + 11, chairY + 35, false, 0.5f);
+            }
+        }
+    }
+
+    // Projector screen (modern classroom)
+    drawRect(400, 500, 400, 240, Color(0.95f, 0.95f, 0.95f));
+    setColor(Color(0.3f, 0.3f, 0.3f));
+    glLineWidth(4.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(400, 500);
+    glVertex2f(800, 500);
+    glVertex2f(800, 740);
+    glVertex2f(400, 740);
+    glEnd();
+
+    // Projector
+    drawRect(580, 450, 40, 25, Color(0.2f, 0.2f, 0.2f), true);
+
+    // Podium
+    drawRect(580, 420, 40, 70, Color(0.6f, 0.4f, 0.2f), true);
+
+    // Guest speaker at podium
+    drawTeacher(600, 490, true, 0.9f);
+
+    // Faculty seating area - horizontally beside podium (left and right)
+    // Left side faculty seating
+    for (int i = 0; i < 3; i++) {
+        float facX = 350 + i * 50;
+        float facY = 450;
+
+        // Faculty chairs (different from student chairs)
+        drawRect(facX, facY, 35, 15, Color(0.4f, 0.2f, 0.1f), true);
+        drawRect(facX, facY + 15, 35, 25, Color(0.4f, 0.2f, 0.1f), true);
+
+        // Faculty members sitting
+        if (i < 3) {
+            drawTeacher(facX + 17, facY + 45, false, 0.7f);
+        }
+    }
+
+    // Right side faculty seating
+    for (int i = 0; i < 3; i++) {
+        float facX = 700 + i * 50;
+        float facY = 450;
+
+        // Faculty chairs
+        drawRect(facX, facY, 35, 15, Color(0.4f, 0.2f, 0.1f), true);
+        drawRect(facX, facY + 15, 35, 25, Color(0.4f, 0.2f, 0.1f), true);
+
+        // Faculty members sitting
+        if (i < 3) {
+            drawTeacher(facX + 17, facY + 45, false, 0.7f);
+        }
+    }
+
+    // AC units
+    drawRect(windowWidth - 130, 600, 80, 40, Color(0.9f, 0.9f, 0.9f), true);
+}
+
+// Scene 7: Enhanced Library
+void drawEnhancedLibrary() {
+    // Floor and walls
+    drawRect(0, 0, windowWidth, 380, Color(0.7f, 0.7f, 0.7f), true);
+    drawRect(0, 380, windowWidth, windowHeight - 380, Color(0.95f, 0.95f, 0.9f), true);
+
+    // Soft ceiling lighting
+    for (int i = 0; i < 4; i++) {
+        drawRect(200 + i * 200, 680, 150, 12, GHIBLI_WARM_YELLOW, true);
+    }
+
+    // Left wall bookshelves
+    for (int i = 0; i < 3; i++) {
+        float shelfY = 220 + i * 160;
+
+        drawRect(50, shelfY, 120, 150, Color(0.6f, 0.3f, 0.1f), true);
+
+        for (int shelf = 0; shelf < 4; shelf++) {
+            drawRect(55, shelfY + 15 + shelf * 35, 110, 4, Color(0.5f, 0.25f, 0.05f), true);
+
+            // Colorful books
+            for (int book = 0; book < 12; book++) {
+                float bookX = 60 + book * 8;
+                float bookY = shelfY + 18 + shelf * 35;
+
+                Color bookColors[] = {
+                    GHIBLI_SOFT_RED, GHIBLI_TREE_GREEN, GHIBLI_WARM_YELLOW,
+                    Color(0.8f, 0.4f, 0.8f), GHIBLI_MINT, Color(0.8f, 0.6f, 0.2f)
+                };
+                drawRect(bookX, bookY, 6, 28, bookColors[book % 6], true);
+            }
+        }
+    }
+
+    // Right wall bookshelves
+    for (int i = 0; i < 3; i++) {
+        float shelfX = windowWidth - 170;
+        float shelfY = 220 + i * 160;
+
+        drawRect(shelfX, shelfY, 120, 150, Color(0.6f, 0.3f, 0.1f), true);
+
+        for (int shelf = 0; shelf < 4; shelf++) {
+            drawRect(shelfX + 5, shelfY + 15 + shelf * 35, 110, 4, Color(0.5f, 0.25f, 0.05f), true);
+
+            for (int book = 0; book < 12; book++) {
+                float bookX = shelfX + 10 + book * 8;
+                float bookY = shelfY + 18 + shelf * 35;
+
+                Color bookColors[] = {
+                    Color(0.8f, 0.4f, 0.1f), Color(0.3f, 0.7f, 0.5f), GHIBLI_LAVENDER,
+                    GHIBLI_PEACH, Color(0.4f, 0.6f, 0.9f), Color(0.7f, 0.5f, 0.4f)
+                };
+                drawRect(bookX, bookY, 6, 28, bookColors[book % 6], true);
+            }
+        }
+    }
+
+    // Study tables with students
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 2; j++) {
+            float tableX = 250 + i * 180;
+            float tableY = 150 + j * 180;
+
+            // Table
+            drawRect(tableX, tableY, 140, 70, Color(0.6f, 0.3f, 0.1f), true);
+
+            // Orange chairs with students
+            Color chairColor = GHIBLI_WARM_YELLOW;
+
+            drawRect(tableX - 25, tableY + 10, 20, 20, chairColor, true);
+            drawEnhancedStudent(tableX - 15, tableY + 35, false, 0.65f);
+
+            drawRect(tableX + 145, tableY + 10, 20, 20, chairColor, true);
+            drawEnhancedStudent(tableX + 155, tableY + 35, false, 0.65f);
+
+            if ((i + j) % 3 != 0) {
+                drawRect(tableX - 25, tableY + 40, 20, 20, chairColor, true);
+                drawEnhancedStudent(tableX - 15, tableY + 65, false, 0.65f);
+            }
+
+            if ((i + j) % 4 != 0) {
+                drawRect(tableX + 145, tableY + 40, 20, 20, chairColor, true);
+                drawEnhancedStudent(tableX + 155, tableY + 65, false, 0.65f);
+            }
+        }
+    }
+
+    // Library officer desk
+    drawRect(200, 450, 100, 60, Color(0.5f, 0.3f, 0.1f), true);
+    drawTeacher(250, 510, false, 0.8f); // Library officer sitting
+    // Globe with character
+    drawCircle(250, 480, 20, Color(0.3f, 0.6f, 0.8f), true);
+    drawRect(250, 480, 10, 15, Color(0.4f, 0.2f, 0.1f), true);
+
+    // Continent details on globe
+    setColor(GHIBLI_TREE_GREEN);
+    drawCircle(250, 480, 8, GHIBLI_TREE_GREEN);
+    drawCircle(250, 480, 6, GHIBLI_TREE_GREEN);
+
+    // Students reading beside shelves
+    drawEnhancedStudent(185, 300, false, 0.7f);
+    drawEnhancedStudent(windowWidth - 205, 320, false, 0.7f);
+    drawEnhancedStudent(windowWidth - 210, 540, false, 0.65f);
+}
+
+// Scene 8: Return to Jamalkhan Bus Stop
+void drawReturnToJamalkhan() {
+    drawEnhancedSky();
+
+    // Similar to Scene 0 but with evening ambiance
+    drawRect(0, 0, windowWidth, windowHeight, GROUND_COLOR, true);
+
+    // Main roads
+    drawRect(0, 350, windowWidth, 100, GHIBLI_ROAD, true);
+    drawRect(550, 0, 100, windowHeight, GHIBLI_ROAD, true);
+
+    // Road markings
+    setColor(GHIBLI_WHITE);
+    for (int i = 0; i < 12; i++) {
+        drawRect(i * 110 + 30, 390, 70, 20, GHIBLI_WHITE);
+    }
+    for (int i = 0; i < 8; i++) {
+        drawRect(590, i * 100 + 30, 20, 60, GHIBLI_WHITE);
+    }
+
+    // Central roundabout
+    drawCircle(600, 400, 45, Color(0.6f, 0.5f, 0.3f), true);
+    drawCircle(600, 400, 35, GHIBLI_TREE_GREEN);
+
+     // Monument in roundabout
+    drawRect(590, 385, 20, 35, GHIBLI_CREAM, true);
+
+    // Buildings with evening lights
+    drawEnhancedBuilding(50, 450, 120, 120, GHIBLI_CREAM, Color(1.0f, 0.9f, 0.5f), 3);
+    drawEnhancedBuilding(200, 470, 100, 100, GHIBLI_WARM_PINK, Color(1.0f, 0.9f, 0.5f), 2);
+    drawEnhancedBuilding(720, 450, 130, 130, Color(0.8f, 0.9f, 0.8f), Color(1.0f, 0.9f, 0.5f), 3);
+
+    // Buildings on all four sides - properly placed on sidewalks
+    // Top side buildings
+    drawEnhancedBuilding(50, 450, 120, 120, GHIBLI_CREAM, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(200, 470, 100, 100, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(320, 460, 140, 110, GHIBLI_LAVENDER, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(720, 450, 130, 130, Color(0.8f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(880, 470, 110, 100, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(1020, 460, 150, 120, GHIBLI_MINT, GHIBLI_WARM_YELLOW, 3);
+
+    // Bottom side buildings
+    drawEnhancedBuilding(80, 180, 140, 140, Color(0.9f, 0.8f, 0.7f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(250, 200, 110, 120, GHIBLI_SOFT_BLUE, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(380, 190, 120, 130, Color(0.8f, 0.8f, 0.9f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(750, 180, 120, 140, GHIBLI_WARM_PINK, GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(900, 200, 130, 120, Color(0.9f, 0.9f, 0.8f), GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(1060, 190, 120, 130, GHIBLI_LAVENDER, GHIBLI_WARM_YELLOW, 3);
+
+    // Left side buildings
+    drawEnhancedBuilding(50, 580, 100, 120, Color(0.8f, 0.7f, 0.9f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(180, 600, 120, 100, GHIBLI_PEACH, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(330, 590, 110, 110, Color(0.7f, 0.8f, 0.8f), GHIBLI_WARM_YELLOW, 2);
+
+    // Right side buildings
+    drawEnhancedBuilding(750, 580, 110, 120, Color(0.9f, 0.8f, 0.8f), GHIBLI_WARM_YELLOW, 3);
+    drawEnhancedBuilding(890, 600, 100, 100, GHIBLI_MINT, GHIBLI_WARM_YELLOW, 2);
+    drawEnhancedBuilding(1020, 590, 130, 110, Color(0.8f, 0.9f, 0.7f), GHIBLI_WARM_YELLOW, 2);
+    // Church - made more visible
+    drawChurch(450, 40, 0.8f);
+
+    // Shops on sidewalks
+    drawShop(480, 500, 70, 55, Color(0.7f, 0.9f, 0.6f), "general");
+    drawShop(680, 120, 75, 65, Color(0.8f, 0.6f, 0.8f), "general");
+
+    // Trees
+    drawEnhancedTree(480, 520, 1.2f);
+    drawEnhancedTree(720, 540, 1.1f);
+    drawEnhancedTree(750, 80, 1.0f);
+
+    // Evening traffic
+    float eveningCar1X = fmod(animationProgress * 0.35f, windowWidth + 250) - 125;
+    if (eveningCar1X > -100 && eveningCar1X < windowWidth) {
+        drawEnhancedCar(eveningCar1X, 370, Color(0.6f, 0.6f, 0.8f));
+    }
+
+    // Traffic on roads
+    float car1X = fmod(animationProgress * 0.4f, windowWidth + 300) - 150;
+    float car2X = fmod(animationProgress * 0.3f + 400, windowWidth + 300) - 150;
+
+    if (car1X > -120 && car1X < windowWidth) {
+        drawEnhancedCar(car1X, 370, GHIBLI_SOFT_RED);
+    }
+    if (car2X > -120 && car2X < windowWidth) {
+        drawEnhancedCar(car2X, 370, Color(0.2f, 0.6f, 0.8f));
+    }
+
+    // Bus returning
+    float returnBusX = windowWidth + 100 - animationProgress * 0.25f;
+    if (returnBusX < windowWidth - 150) returnBusX = windowWidth - 150;
+    drawEnhancedBus(returnBusX, 320, 0.9f);
+
+    // Student walking towards bus
+    if (animationProgress > 2000) {
+        float studentReturnX = returnBusX - 50 - (animationProgress - 2000) * 0.03f;
+        drawEnhancedStudent(studentReturnX, 380, true, 1.0f, -1);
+    }
+
+    // Guards
+    drawGuard(510, 380, 0.9f);
+    drawGuard(680, 380, 0.85f);
+
+    // Evening ambiance overlay
+    setColor(Color(0.8f, 0.7f, 0.5f, 0.1f));
+    drawRect(0, 0, windowWidth, windowHeight, Color(0.8f, 0.7f, 0.5f, 0.1f));
+}
+
+// Main display function
+void display() {
+    glClear(GL_COLOR_BUFFER_BIT);
+    glLoadIdentity();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    switch(currentScene) {
+        case 0: drawEnhancedJamalkhanBusStop(); break;
+        case 1: drawEnhancedSeniorCitizensClub(); break;
+        case 2: drawEnhancedUphillToCIU(); break;
+        case 3: drawEnhancedCIUBuilding(); break;
+        case 4: drawEnhancedCIUCafeteria(); break;
+        case 5: drawEnhancedComputerLab(); break;
+        case 6: drawEnhancedSeminarHall(); break;
+        case 7: drawEnhancedLibrary(); break;
+        case 8: drawReturnToJamalkhan(); break;
+    }
+
+    // Subtle vignette effect
+    glBegin(GL_QUADS);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.15f);
+    glVertex2f(0, windowHeight);
+    glVertex2f(windowWidth, windowHeight);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.0f);
+    glVertex2f(windowWidth, windowHeight - 80);
+    glVertex2f(0, windowHeight - 80);
+    glEnd();
+
+    glBegin(GL_QUADS);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.0f);
+    glVertex2f(0, 80);
+    glVertex2f(windowWidth, 80);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.15f);
+    glVertex2f(windowWidth, 0);
+    glVertex2f(0, 0);
+    glEnd();
+
+    glutSwapBuffers();
+}
+
+// Timer function
+void timer(int value) {
+    if (autoAnimation) {
+        sceneTimer += 16.0f;
+        animationProgress += 16.0f;
+        windTime += 0.3f;
+        cloudTime += 0.2f;
+
+        if (sceneTimer > SCENE_DURATION) {
+            currentScene = (currentScene + 1) % totalScenes;
+            sceneTimer = 0.0f;
+            animationProgress = 0.0f;
+        }
+    } else {
+        animationProgress += 16.0f;
+        windTime += 0.3f;
+        cloudTime += 0.2f;
+    }
+
+    glutPostRedisplay();
+    glutTimerFunc(16, timer, 0);
+}
+
+// Keyboard input
+void keyboard(unsigned char key, int x, int y) {
+    switch(key) {
+        case 'n':
+        case 'N':
+            currentScene = (currentScene + 1) % totalScenes;
+            animationProgress = 0.0f;
+            sceneTimer = 0.0f;
+            std::cout << "Moving to: " << sceneNames[currentScene] << std::endl;
+            break;
+        case 'p':
+        case 'P':
+            currentScene = (currentScene - 1 + totalScenes) % totalScenes;
+            animationProgress = 0.0f;
+            sceneTimer = 0.0f;
+            std::cout << "Moving to: " << sceneNames[currentScene] << std::endl;
+            break;
+        case 'a':
+        case 'A':
+            autoAnimation = !autoAnimation;
+            std::cout << "Auto animation: " << (autoAnimation ? "ON" : "OFF") << std::endl;
+            break;
+        case '1': case '2': case '3': case '4': case '5':
+        case '6': case '7': case '8': case '9':
+            {
+                int newScene = key - '1';
+                if (newScene < totalScenes) {
+                    currentScene = newScene;
+                    animationProgress = 0.0f;
+                    sceneTimer = 0.0f;
+                    std::cout << "Jumping to: " << sceneNames[currentScene] << std::endl;
+                }
+            }
+            break;
+        case 27: // ESC
+            std::cout << "Thank you for the Enhanced Journey to CIU!" << std::endl;
+            exit(0);
+            break;
+    }
+    glutPostRedisplay();
+}
+
+// Initialize OpenGL
+void init() {
+    glClearColor(0.6f, 0.8f, 0.95f, 1.0f);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, windowWidth, 0, windowHeight);
+    glMatrixMode(GL_MODELVIEW);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_LINE_SMOOTH);
+    glEnable(GL_POINT_SMOOTH);
+    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
+}
+
+// Reshape function
+void reshape(int w, int h) {
+    windowWidth = w;
+    windowHeight = h;
+    glViewport(0, 0, w, h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, w, 0, h);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// Mouse interaction
+void mouse(int button, int state, int x, int y) {
+    if (state == GLUT_DOWN) {
+        if (button == GLUT_LEFT_BUTTON) {
+            currentScene = (currentScene + 1) % totalScenes;
+            animationProgress = 0.0f;
+            sceneTimer = 0.0f;
+            std::cout << "Mouse: Moving to " << sceneNames[currentScene] << std::endl;
+        } else if (button == GLUT_RIGHT_BUTTON) {
+            autoAnimation = !autoAnimation;
+            std::cout << "Mouse: Auto animation " << (autoAnimation ? "ON" : "OFF") << std::endl;
+        }
+        glutPostRedisplay();
+    }
+}
+
+// Special keys
+void specialKeys(int key, int x, int y) {
+    switch(key) {
+        case GLUT_KEY_RIGHT:
+            currentScene = (currentScene + 1) % totalScenes;
+            animationProgress = 0.0f;
+            sceneTimer = 0.0f;
+            break;
+        case GLUT_KEY_LEFT:
+            currentScene = (currentScene - 1 + totalScenes) % totalScenes;
+            animationProgress = 0.0f;
+            sceneTimer = 0.0f;
+            break;
+        case GLUT_KEY_HOME:
+            currentScene = 0;
+            animationProgress = 0.0f;
+            sceneTimer = 0.0f;
+            break;
+        case GLUT_KEY_END:
+            currentScene = totalScenes - 1;
+            animationProgress = 0.0f;
+            sceneTimer = 0.0f;
+            break;
+    }
+    glutPostRedisplay();
+}
+
+// Main function
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+    glutInitWindowSize(windowWidth, windowHeight);
+    glutInitWindowPosition(100, 50);
+    glutCreateWindow("Enhanced Journey to CIU - Fixed Realistic Layout");
+
+    init();
+
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutKeyboardFunc(keyboard);
+    glutSpecialFunc(specialKeys);
+    glutMouseFunc(mouse);
+    glutTimerFunc(16, timer, 0);
+
+    // Enhanced welcome message
+    std::cout << "\n" << std::string(70, '=') << std::endl;
+    std::cout << "🌟 ENHANCED JOURNEY TO CIU - FIXED REALISTIC LAYOUT 🌟" << std::endl;
+    std::cout << std::string(70, '=') << std::endl;
+    std::cout << "\n✨ Experience the complete realistic journey with proper layout!" << std::endl;
+    std::cout << "\n🎮 CONTROLS:" << std::endl;
+    std::cout << "   • N/n         - Next scene" << std::endl;
+    std::cout << "   • P/p         - Previous scene" << std::endl;
+    std::cout << "   • A/a         - Toggle auto animation" << std::endl;
+    std::cout << "   • 1-9         - Jump to specific scene" << std::endl;
+    std::cout << "   • Arrow Keys  - Navigate scenes" << std::endl;
+    std::cout << "   • ESC         - Exit" << std::endl;
+    std::cout << "\n🔧 MAJOR FIXES IMPLEMENTED:" << std::endl;
+    std::cout << "   ✓ FIXED: Sidewalks now run vertically alongside roads" << std::endl;
+    std::cout << "   ✓ FIXED: All buildings moved to sidewalks, not floating on roads" << std::endl;
+    std::cout << "   ✓ FIXED: CIU building properly grounded behind gate" << std::endl;
+    std::cout << "   ✓ FIXED: Removed green structure before CIU gate" << std::endl;
+    std::cout << "   ✓ FIXED: Church made visible in Jamalkhan bus stop" << std::endl;
+    std::cout << "   ✓ FIXED: Buildings added on all four sides of roads in bus stop" << std::endl;
+    std::cout << "   ✓ FIXED: Faculty seating placed horizontally beside podium" << std::endl;
+    std::cout << "   ✓ FIXED: Senior citizens scene - removed sky, added ground buildings" << std::endl;
+    std::cout << "   ✓ ENHANCED: More shops, trees, and realistic urban environment" << std::endl;
+    std::cout << "   ✓ ENHANCED: Better traffic flow and pedestrian movement" << std::endl;
+    std::cout << "\n🏗️ LAYOUT IMPROVEMENTS:" << std::endl;
+    std::cout << "   • Realistic road network with proper intersections" << std::endl;
+    std::cout << "   • Buildings positioned on sidewalks and open areas" << std::endl;
+    std::cout << "   • Vertical sidewalks with seating and greenery" << std::endl;
+    std::cout << "   • Proper ground-level architecture throughout" << std::endl;
+    std::cout << "   • Enhanced urban planning with shops and amenities" << std::endl;
+    std::cout << "\n" << std::string(70, '=') << std::endl;
+    std::cout << "Press any key to begin your enhanced realistic journey..." << std::endl;
+    std::cout << std::string(70, '=') << std::endl;
+
+    glutMainLoop();
+    return 0;
+}
